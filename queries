@@ -1,0 +1,389 @@
+#CREATE THE TABLE AND IMPORT DATA
+
+CREATE TABLE OLYMPICS_HISTORY
+(
+	id INT,
+	name VARCHAR,
+	sex	VARCHAR,
+	age VARCHAR,
+	height VARCHAR,
+	weight VARCHAR,
+	team VARCHAR,
+	noc VARCHAR,
+	games VARCHAR,
+	year INT,
+	season VARCHAR,
+	city VARCHAR,
+	sport VARCHAR,
+	event VARCHAR,
+	medal VARCHAR
+);
+
+CREATE TABLE NOC_REGIONS
+(
+	noc VARCHAR,
+	region VARCHAR,
+	notes VARCHAR
+);
+
+
+#TO CHECK IF DATA WAS SUCESSFULLY IMPORTED (ITS IMPORTANT TO LIMIT IF USE SELECT *)
+
+SELECT * 
+FROM NOC_REGIONS 
+LIMIT 5
+
+
+1. How many olympics games have been held?
+
+SELECT COUNT(DISTINCT games)
+FROM OLYMPICS_HISTORY
+
+
+2. List down all Olympics games held so far.
+
+SELECT DISTINCT games
+FROM OLYMPICS_HISTORY
+
+
+3. Mention the total no of nations who participated in each olympics game?
+
+SELECT games,
+	COUNT(DISTINCT noc) as total_nations
+FROM olympics_history
+GROUP BY games
+ORDER BY games ASC;
+
+
+4. Which year saw the highest and lowest no of countries participating in olympics?
+
+SELECT Year,
+	COUNT(DISTINCT noc) as no_of_countries
+FROM olympics_history
+group by year
+ORDER BY no_of_countries ASC;
+
+# = 1896 (12)
+
+SELECT Year,
+	COUNT(DISTINCT team) as no_of_countries
+FROM olympics_history
+group by year
+ORDER BY no_of_countries DESC;
+
+# = 2016 (207)
+
+
+
+5. Which nation has participated in all of the olympic games?
+
+
+SELECT team,
+	COUNT(DISTINCT games)
+FROM olympics_history
+GROUP BY team
+HAVING COUNT(DISTINCT games) = 51;
+
+
+6. Identify the sport which was played in all summer olympics.
+# First I wanna know how many summer olympics there were:
+
+SELECT DISTINCT games
+FROM OLYMPICS_HISTORY
+WHERE games LIKE '%Summer%';  
+
+# Count = 29 summer games. Ok. Now, I have to count which sports were played in summer
+
+SELECT sport, 
+       COUNT(DISTINCT CASE WHEN games LIKE '%Summer%' THEN games END) AS no_of_summer_games
+FROM olympics_history
+GROUP BY sport
+HAVING COUNT(DISTINCT CASE WHEN games LIKE '%Summer%' THEN games END) = 29
+ORDER BY no_of_summer_games DESC;
+
+# We could use a Common Table Expression as well. It creates smth similar to an alias, a CTE, that you can use later on your query as a reference. Ex: 
+
+WITH SummerGamesCount AS (
+    SELECT sport, 
+           COUNT(DISTINCT CASE WHEN games LIKE '%Summer%' THEN games END) AS no_of_summer_games
+    FROM olympics_history
+    GROUP BY sport
+)
+SELECT sport, no_of_summer_games
+FROM SummerGamesCount
+WHERE no_of_summer_games = 29
+ORDER BY no_of_summer_games DESC;
+ 
+
+
+7. Which Sports were just played only once in the olympics?
+
+SELECT sport,
+	COUNT(DISTINCT games) as no_of_games
+FROM olympics_history
+GROUP BY sport
+HAVING COUNT(DISTINCT games) = 1;
+
+
+8. Fetch the total no of sports played in each olympic games.
+
+SELECT games,
+ 	COUNT(DISTINCT sport)
+FROM olympics_history
+GROUP BY games
+
+
+9. Fetch details of the oldest athletes to win a gold medal.
+
+SELECT name, sex, age, height, weight, team
+FROM olympics_history
+WHERE medal LIKE '%Gold%' and age != 'NA'
+ORDER BY age DESC
+limit 5;
+
+# The values which are null containg a string "NA", so to make sure the query would gather only those who have age available, i had to filter it with any value differente (!=) than 'NA.
+
+10. Find the Ratio of male and female athletes participated in all olympic games.
+
+WITH female_count AS (
+    SELECT COUNT(*) AS female_total
+    FROM olympics_history
+    WHERE sex LIKE '%F%'
+),
+male_count AS (
+    SELECT COUNT(*) AS male_total
+    FROM olympics_history
+    WHERE sex LIKE '%M%'
+)
+SELECT m.male_total::decimal / f.female_total  AS ratio
+FROM female_count AS f
+CROSS JOIN male_count AS m;
+
+
+#division with integers will result in an integer, so if you add ::decimal, it will make sure to consider decimal houses as well.
+
+11. Fetch the top 5 athletes who have won the most gold medals.
+
+SELECT name,
+       COUNT(*) AS no_golden_medals
+FROM olympics_history
+WHERE medal LIKE '%Gold%'
+GROUP BY name
+ORDER BY no_golden_medals DESC
+LIMIT 5;
+
+
+12. Fetch the top 5 athletes who have won the most medals (gold/silver/bronze).
+
+SELECT name,
+       COUNT(*) AS total_medals
+FROM olympics_history
+WHERE medal LIKE '%Gold%' or medal like '%Silver%' or medal like '%Bronze%'
+GROUP BY name
+ORDER BY total_medals DESC
+LIMIT 5;
+
+
+13. Fetch the top 5 most successful countries in olympics. Success is defined by no of medals won.
+
+
+SELECT NOC, 
+	SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as total_medals
+FROM olympics_history
+GROUP BY NOC
+ORDER BY total_medals DESC
+LIMIT 5;
+
+14. List down total gold, silver and broze medals won by each country.
+
+
+with total_medals as (
+	SELECT NOC, 
+			SUM(CASE WHEN medal LIKE '%Gold%' then 1 else 0 END) as no_golden_medals,
+			SUM(CASE WHEN medal LIKE '%Silver%' then 1 else 0 END) as no_silver_medals,
+			SUM(CASE WHEN medal LIKE '%Bronze%' then 1 else 0 END) as no_bronze_medals
+	FROM olympics_history
+	group by NOC
+)
+SELECT NOC, no_golden_medals, no_silver_medals,  no_bronze_medals
+FROM total_medals
+ORDER BY no_golden_medals DESC
+
+
+# or (more simple):
+
+SELECT NOC, 
+	SUM(CASE WHEN medal like '%Gold%' THEN 1 ELSE 0 END) as t_gold,
+	SUM(CASE WHEN medal like '%Silver%' THEN 1 ELSE 0 END) as t_silver,
+	SUM(CASE WHEN medal like '%Bronze%' THEN 1 ELSE 0 END) as t_bronze
+FROM olympics_history
+GROUP BY NOC
+ORDER BY t_gold DESC
+
+
+15. List down total gold, silver and broze medals won by each country corresponding to each olympic games.
+
+with total_medals as (
+	SELECT NOC, games,
+			SUM(CASE WHEN medal LIKE '%Gold%' then 1 else 0 END) as no_golden_medals,
+			SUM(CASE WHEN medal LIKE '%Silver%' then 1 else 0 END) as no_silver_medals,
+			SUM(CASE WHEN medal LIKE '%Bronze%' then 1 else 0 END) as no_bronze_medals
+	FROM olympics_history
+	group by noc, games
+)
+SELECT games, noc, no_golden_medals, no_silver_medals,  no_bronze_medals
+FROM total_medals
+ORDER BY games ASC
+
+# Or:
+
+SELECT games, NOC,
+	SUM(CASE WHEN medal like '%Gold%' THEN 1 ELSE 0 END) as t_gold,
+	SUM(CASE WHEN medal like '%Silver%' THEN 1 ELSE 0 END) as t_silver,
+	SUM(CASE WHEN medal like '%Bronze%' THEN 1 ELSE 0 END) as t_bronze
+FROM olympics_history
+GROUP BY games, NOC
+ORDER BY games ASC
+
+
+16. Identify which country won the most gold, most silver and most bronze medals in each olympic games.
+
+# This is the first step of thinking the code:
+
+SELECT games, NOC, t_gold
+FROM (
+    SELECT 
+        games, 
+        NOC, 
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) DESC) AS rank
+    FROM 
+        olympics_history
+    GROUP BY 
+        games, NOC
+) AS ranked_countries
+WHERE 
+    rank = 1;
+
+#I'm learning there how to use window functions and subqueries. So lets start by the subquery: it retrieves games, NOC and the sum of number of golden medals for each game, assigned to the alias t_gold. Then, the window function row_number() gives numbers to rows according to (over) something. In this case, the rows that will be given numbers are conditions to the games column (partition by), and the games column it self is ordered according to the total of golden medals of each NOC (the group by is the first execution after the FROM, so the query with the SUM is already grouped by NOC and games). The column of numbers of rows is named rank. Once the subquery is completed, the main query retrieves only the information which contains rank = 1, meaning only the countries for each game (each game has a rank, so the numbers are NOT unique, eg: the number 1 repeats for each game) that had the maximum of golden medals are taken.
+
+SELECT games, NOC, gold_rank, silver_rank, bronze_rank
+FROM (
+    SELECT games, NOC,
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END) AS t_silver,
+        SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) AS t_bronze,
+	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END)DESC) AS gold_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END)DESC) AS silver_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) DESC) AS bronze_rank
+    FROM olympics_history
+    GROUP BY games, NOC
+) AS subquery
+WHERE 
+	gold_rank = 1 OR
+	silver_rank= 1 OR
+	bronze_rank = 1;
+	
+#This is an alright query but the result can be a little confusing because it retrieves, for eg, for the gold rank value = 1, it will also retrieve the values for the columns of silver and bronze rank, that might not be 1 as well. The result is that for each game, unless the NOC is the best in all ranks, we will have multiple rows for each game.
+#The query below is an alternative, but is harder to read and understand:
+
+SELECT games, 
+	CONCAT(NOC, ' ', t_gold) as concat1,
+	CONCAT(NOC, ' ', t_silver) as concat2,
+	CONCAT (NOC, ' ', t_bronze) as concat3
+FROM (
+    SELECT games, NOC,
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END) AS t_silver,
+        SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) AS t_bronze,
+		ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END)DESC) AS gold_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END)DESC) AS silver_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) DESC) AS bronze_rank
+    FROM olympics_history
+    GROUP BY games, NOC
+) AS subquery
+WHERE gold_rank = 1 OR silver_rank = 1 OR bronze_rank = 1
+
+
+ 
+
+17. Identify which country won the most gold, most silver, most bronze medals and the most medals in each olympic games.
+
+SELECT games, noc, gold_rank, silver_rank, bronze_rank, medal_rank
+FROM (
+    SELECT games, NOC,
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END) AS t_silver,
+        SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) AS t_bronze,
+		SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as t_medals,
+		ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END)DESC) AS gold_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END)DESC) AS silver_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) DESC) AS bronze_rank,
+		ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) DESC) as medal_rank
+    FROM olympics_history
+    GROUP BY games, NOC
+) AS subquery
+WHERE gold_rank = 1 OR silver_rank = 1 OR bronze_rank = 1 OR medal_rank = 1
+
+# or:
+
+SELECT games, 
+	CONCAT(noc, ' ', t_gold) as first_in_rank_gold,
+	CONCAT(noc, ' ', t_silver) as first_in_rank_siver,
+	CONCAT(noc, ' ', t_bronze) as first_in_rank_bronze,
+	CONCAT(noc, ' ', t_medals) as first_in_rank_medal
+FROM (
+    SELECT games, NOC,
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END) AS t_silver,
+        SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) AS t_bronze,
+		SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as t_medals,
+		ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END)DESC) AS gold_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END)DESC) AS silver_rank,
+       	ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) DESC) AS bronze_rank,
+		ROW_NUMBER() OVER (PARTITION BY games ORDER BY SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) DESC) as medal_rank
+    FROM olympics_history
+    GROUP BY games, NOC
+) AS subquery
+WHERE gold_rank = 1 OR silver_rank = 1 OR bronze_rank = 1 OR medal_rank = 1
+
+# Has the same problem as the query before. It repeats the games so the readability is not the best.
+
+18. Which countries have never won gold medal but have won silver/bronze medals?
+
+SELECT noc, t_gold, t_silver, t_bronze
+FROM (
+    SELECT NOC,
+        SUM(CASE WHEN medal LIKE '%Gold%' THEN 1 ELSE 0 END) AS t_gold,
+        SUM(CASE WHEN medal LIKE '%Silver%' THEN 1 ELSE 0 END) AS t_silver,
+        SUM(CASE WHEN medal LIKE '%Bronze%' THEN 1 ELSE 0 END) AS t_bronze,
+		SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as t_medals
+    FROM olympics_history
+    GROUP BY NOC
+) AS subquery
+WHERE t_gold = 0 and (t_silver != 0 or t_bronze != 0)
+ORDER BY t_bronze ASC
+
+
+19. In which Sport/event, India has won highest medals.
+
+SELECT sport, SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as t_medals
+FROM olympics_history
+WHERE NOC = 'IND'
+GROUP BY sport
+order by t_medals DESC
+LIMIT 1
+
+
+20. Break down all olympic games where india won medal for Hockey and how many medals in each olympic games.
+
+SELECT games, SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) as t_medals
+FROM olympics_history
+WHERE NOC = 'IND' and sport = 'Hockey' 
+GROUP BY games
+HAVING SUM(CASE WHEN medal NOT LIKE '%NA%' THEN 1 ELSE 0 END) > 0
+ORDER BY t_medals DESC
+
+
+
+
