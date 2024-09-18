@@ -1,4 +1,4 @@
-# SQL-olympics-challenge
+# 	:medal_sports: SQL-olympics-challenge
 
 The goal of this project was to practice my skills of writing SQL queries based on a real dataset. I was completing this challenge as I was improving my knowledge of SQL, so you will find in some answers more than one option of query using different strategies (subqueries, CTE's, aggregate functions, etc), as well as some comments that explain my decision-making process. 
 
@@ -9,4 +9,4 @@ In this directory, you will find the:
 - a list containing questions for analysis;
 - the queries I've written to answer the questions above.
 
-I've used PostegreSQL and pgAdmin 4 for this project.
+I've used PostegreSQL for this project.
